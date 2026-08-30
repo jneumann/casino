@@ -1,0 +1,39 @@
+[package]
+name = "casino-backend"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "casino_backend"
+path = "src/lib.rs"
+
+[[bin]]
+name = "casino-backend"
+path = "src/main.rs"
+
+[[bin]]
+name = "create-user"
+path = "src/bin/create_user.rs"
+
+[[bin]]
+name = "create-operator"
+path = "src/bin/create_operator.rs"
+
+[dependencies]
+actix-files = "0.7.0"
+actix-web = "4"
+anyhow = "1.0.104"
+argon2 = "0.5.3"
+async-trait = "0.1.92"
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde", "std"] }
+dotenvy = "0.15.7"
+jsonwebtoken = { version = "11", default-features = false, features = ["rust_crypto"] }
+rand = "0.8"
+rand_core = { version = "0.6", features = ["getrandom", "std"] }
+rpassword = "7.5.4"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-none", "sqlite", "macros", "migrate", "chrono"] }
+thiserror = "2.0.20"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

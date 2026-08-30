@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Accounts &middot; Casino Backend</title>
+    <link rel="stylesheet" href="/admin/app.css?v=adjust-1" />
+  </head>
+  <body class="page">
+    <header class="topbar">
+      <div class="topbar__title">
+        <div class="chip" aria-hidden="true">&#9824;</div>
+        <div>
+          <h1>Accounts</h1>
+          <p class="muted" id="signed-in-as">&nbsp;</p>
+        </div>
+      </div>
+
+      <div class="topbar__actions">
+        <nav class="nav" aria-label="Sections">
+          <a class="nav__link" href="/status">Status</a>
+          <a class="nav__link is-active" href="/admin/users">Accounts</a>
+        </nav>
+        <button id="logout" class="button button--ghost" type="button">
+          Sign out
+        </button>
+      </div>
+    </header>
+
+    <main class="content">
+      <p id="error" class="alert" role="alert" hidden></p>
+      <p id="notice" class="notice" role="status" hidden></p>
+
+      <section class="section" aria-label="Your password">
+        <h2 class="section-title">Your password</h2>
+        <article class="card">
+          <form id="own-password-form" novalidate>
+            <div class="form-grid">
+              <label class="field">
+                <span>Current password</span>
+                <input
+                  id="current-password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                />
+              </label>
+              <label class="field">
+                <span>New password</span>
+                <input
+                  id="new-password"
+                  type="password"
+                  autocomplete="new-password"
+                  required
+                />
+              </label>
+              <label class="field">
+                <span>Confirm new password</span>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  autocomplete="new-password"
+                  required
+                />
+              </label>
+              <button class="button button--primary" type="submit">
+                Update password
+              </button>
+            </div>
+          </form>
+          <p class="muted" style="margin-top: 10px">
+            Changing your password signs out your other sessions.
+          </p>
+        </article>
+      </section>
+
+      <section class="section" aria-label="Operators">
+        <div class="section__header">
+          <h2 class="section-title">Operators</h2>
+          <p class="muted" id="operators-summary">&nbsp;</p>
+        </div>
+
+        <article class="card" id="add-operator-card" hidden>
+          <h2>Add an operator</h2>
+          <form id="add-operator-form" novalidate>
+            <div class="form-grid">
+              <label class="field">
+                <span>Username</span>
+                <input
+                  id="new-username"
+                  type="text"
+                  autocomplete="off"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  required
+                />
+              </label>
+              <label class="field">
+                <span>Password</span>
+                <input
+                  id="new-operator-password"
+                  type="password"
+                  autocomplete="new-password"
+                  required
+                />
+              </label>
+              <label class="field">
+                <span>Role</span>
+                <select id="new-role">
+                  <option value="viewer">Viewer &mdash; read only</option>
+                  <option value="admin">Admin &mdash; manages accounts and balances</option>
+                </select>
+              </label>
+              <button class="button button--primary" type="submit">
+                Create operator
+              </button>
+            </div>
+          </form>
+        </article>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Operator</th>
+                <th scope="col">Role</th>
+                <th scope="col">Status</th>
+                <th scope="col">Last sign-in</th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody id="operators"></tbody>
+          </table>
+          <p class="empty" id="operators-empty" hidden>No operators yet.</p>
+        </div>
+      </section>
+
+      <section class="section" aria-label="Players">
+        <div class="section__header">
+          <h2 class="section-title">Players</h2>
+          <div class="toolbar">
+            <input
+              id="player-search"
+              type="search"
+              placeholder="Search username"
+              autocomplete="off"
+            />
+            <button id="player-search-button" class="button" type="button">
+              Search
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Player</th>
+                <th scope="col">Balance</th>
+                <th scope="col">Status</th>
+                <th scope="col">Last sign-in</th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody id="players"></tbody>
+          </table>
+          <p class="empty" id="players-empty" hidden>No players found.</p>
+        </div>
+      </section>
+
+      <section class="section" aria-label="Balance adjustments">
+        <div class="section__header">
+          <h2 class="section-title">Balance adjustments</h2>
+          <p class="muted" id="adjustments-summary">&nbsp;</p>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">When</th>
+                <th scope="col">Player</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Balance after</th>
+                <th scope="col">Operator</th>
+                <th scope="col">Reason</th>
+              </tr>
+            </thead>
+            <tbody id="adjustments"></tbody>
+          </table>
+          <p class="empty" id="adjustments-empty" hidden>
+            No balance adjustments yet.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="adjust-dialog" class="dialog--wide">
+      <form id="adjust-form" novalidate>
+        <h2>Adjust balance</h2>
+        <p class="muted" id="adjust-target">&nbsp;</p>
+        <label class="field" style="margin: 14px 0 0">
+          <span>Amount (coins)</span>
+          <input
+            id="adjust-delta"
+            type="number"
+            step="1"
+            required
+          />
+        </label>
+        <p class="muted">
+          A positive amount adds coins. A negative amount removes them. The
+          balance cannot go below zero.
+        </p>
+        <label class="field" style="margin: 14px 0 0">
+          <span>Reason</span>
+          <input
+            id="adjust-reason"
+            type="text"
+            maxlength="280"
+            autocomplete="off"
+            required
+          />
+        </label>
+        <div class="dialog-actions" style="margin-top: 16px">
+          <button
+            class="button button--ghost"
+            type="button"
+            id="adjust-cancel"
+          >
+            Cancel
+          </button>
+          <button class="button button--primary" type="submit">
+            Apply adjustment
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="reset-dialog">
+      <form id="reset-form" novalidate>
+        <h2>Reset password</h2>
+        <p class="muted" id="reset-target">&nbsp;</p>
+        <label class="field" style="margin: 14px 0">
+          <span>New password</span>
+          <input
+            id="reset-password"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <p class="muted">
+          They stay signed out of other sessions until they sign in again.
+        </p>
+        <div class="dialog-actions" style="margin-top: 16px">
+          <button
+            class="button button--ghost"
+            type="button"
+            id="reset-cancel"
+          >
+            Cancel
+          </button>
+          <button class="button button--primary" type="submit">
+            Set password
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/admin/users.js?v=adjust-1"></script>
+  </body>
+</html>

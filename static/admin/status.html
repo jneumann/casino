@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Status &middot; Casino Backend</title>
+    <link rel="stylesheet" href="/admin/app.css" />
+  </head>
+  <body class="page">
+    <header class="topbar">
+      <div class="topbar__title">
+        <div class="chip" aria-hidden="true">&#9824;</div>
+        <div>
+          <h1>Service status</h1>
+          <p class="muted" id="signed-in-as">&nbsp;</p>
+        </div>
+      </div>
+
+      <div class="topbar__actions">
+        <nav class="nav" aria-label="Sections">
+          <a class="nav__link is-active" href="/status">Status</a>
+          <a class="nav__link" href="/admin/users">Accounts</a>
+        </nav>
+        <span id="overall" class="badge badge--muted">checking&hellip;</span>
+        <button id="refresh" class="button" type="button">Refresh</button>
+        <button id="logout" class="button button--ghost" type="button">
+          Sign out
+        </button>
+      </div>
+    </header>
+
+    <main class="content">
+      <p id="error" class="alert" role="alert" hidden></p>
+
+      <section class="grid" aria-label="Summary">
+        <article class="card metric">
+          <h2>Uptime</h2>
+          <p class="metric__value" id="uptime">&mdash;</p>
+          <p class="muted" id="started-at">&nbsp;</p>
+        </article>
+
+        <article class="card metric">
+          <h2>Version</h2>
+          <p class="metric__value" id="version">&mdash;</p>
+          <p class="muted" id="environment">&nbsp;</p>
+        </article>
+
+        <article class="card metric">
+          <h2>Database</h2>
+          <p class="metric__value" id="db-latency">&mdash;</p>
+          <p class="muted" id="db-backend">&nbsp;</p>
+        </article>
+
+        <article class="card metric">
+          <h2>Players</h2>
+          <p class="metric__value" id="user-count">&mdash;</p>
+          <p class="muted">registered accounts</p>
+        </article>
+      </section>
+
+      <section aria-label="Checks">
+        <h2 class="section-title">Checks</h2>
+        <ul class="checks" id="checks"></ul>
+      </section>
+
+      <p class="muted footer-note">
+        Last updated <span id="generated-at">never</span>. Auto-refreshes every
+        15&nbsp;seconds.
+      </p>
+    </main>
+
+    <script type="module" src="/admin/status.js"></script>
+  </body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sign in &middot; Casino Backend</title>
+    <link rel="stylesheet" href="/admin/app.css" />
+  </head>
+  <body class="page page--centered">
+    <main class="card card--auth">
+      <header class="auth-header">
+        <div class="chip" aria-hidden="true">&#9824;</div>
+        <h1>Casino Backend</h1>
+        <p class="muted">Operator sign-in. Players use the game at /.</p>
+      </header>
+
+      <form id="login-form" novalidate>
+        <label class="field">
+          <span>Username</span>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+          />
+        </label>
+
+        <label class="field">
+          <span>Password</span>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+
+        <p id="error" class="alert" role="alert" hidden></p>
+
+        <button id="submit" class="button button--primary" type="submit">
+          Sign in
+        </button>
+      </form>
+    </main>
+
+    <script type="module" src="/admin/login.js"></script>
+  </body>
+</html>

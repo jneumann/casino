@@ -1,0 +1,203 @@
+:root {
+  --gold: #e8c46a;
+  --gold-deep: #b8912f;
+  --cream: #f6f1e4;
+  --muted: #93a89c;
+  --red: #c2413a;
+  --panel: rgba(7, 32, 24, 0.86);
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-display: "Playfair Display", "Bodoni 72", Didot, Georgia,
+    "Times New Roman", serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: #050d0a;
+  color: var(--cream);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+#game {
+  position: relative;
+  /* Phaser centres the canvas with a top margin. Without a block formatting
+     context that margin collapses through this element and drags it down,
+     which knocks the DOM overlay out of line with the canvas. */
+  display: flow-root;
+  width: 100vw;
+  height: 100vh;
+}
+
+#game canvas {
+  display: block;
+}
+
+.noscript {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  font-size: 18px;
+  color: var(--gold);
+}
+
+/* ---------------------------------------------------------------- auth card */
+
+.auth-card {
+  /* Phaser's DOM layer is pointer-events: none so canvas buttons stay
+     clickable; the form opts back in. */
+  pointer-events: auto;
+  width: 420px;
+  padding: 26px 30px 30px;
+  border: 1px solid rgba(184, 145, 47, 0.55);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(6px);
+  font-family: var(--font-body);
+  text-align: left;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 5px;
+  margin-bottom: 22px;
+  border: 1px solid rgba(184, 145, 47, 0.3);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.auth-tab {
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: 600 14px var(--font-body);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.auth-tab:hover {
+  color: var(--cream);
+}
+
+.auth-tab.is-active {
+  background: linear-gradient(180deg, #f0d089, var(--gold-deep));
+  color: #1c1405;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.auth-form.is-busy {
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.auth-field[hidden] {
+  display: none;
+}
+
+.auth-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.auth-field input {
+  padding: 12px 14px;
+  border: 1px solid rgba(184, 145, 47, 0.34);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.38);
+  color: var(--cream);
+  font: 16px var(--font-body);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.auth-field input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(232, 196, 106, 0.16);
+}
+
+.auth-field input:-webkit-autofill {
+  -webkit-text-fill-color: var(--cream);
+  -webkit-box-shadow: 0 0 0 40px #0b2b20 inset;
+}
+
+.auth-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.auth-alert {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(194, 65, 58, 0.5);
+  border-radius: 10px;
+  background: rgba(194, 65, 58, 0.14);
+  color: #f3b7b2;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.auth-alert[hidden] {
+  display: none;
+}
+
+.auth-submit {
+  margin-top: 4px;
+  padding: 14px;
+  border: 1px solid var(--gold-deep);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f2d894, var(--gold));
+  color: #1c1405;
+  font: 700 16px var(--font-body);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    filter 140ms ease,
+    transform 90ms ease;
+}
+
+.auth-submit:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+
+.auth-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.auth-submit:disabled {
+  cursor: progress;
+  filter: saturate(0.5) brightness(0.85);
+}
