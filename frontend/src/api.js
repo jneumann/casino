@@ -65,4 +65,24 @@ export const api = {
   paytable: () => request("/slots/paytable"),
 
   spin: (token, bet) => request("/slots/spin", { method: "POST", token, body: { bet } }),
+
+  videoPokerPaytable: () => request("/video-poker/paytable"),
+
+  videoPokerHand: (token) => request("/video-poker/hand", { token }),
+
+  videoPokerDeal: (token, bet) =>
+    request("/video-poker/deal", { method: "POST", token, body: { bet } }),
+
+  videoPokerDraw: (token, held) =>
+    request("/video-poker/draw", { method: "POST", token, body: { held } }),
+
+  blackjackRules: () => request("/blackjack/rules"),
+
+  blackjackHand: (token) => request("/blackjack/hand", { token }),
+
+  blackjackDeal: (token, bet) =>
+    request("/blackjack/deal", { method: "POST", token, body: { bet } }),
+
+  blackjackAct: (token, action) =>
+    request("/blackjack/act", { method: "POST", token, body: { action } }),
 };

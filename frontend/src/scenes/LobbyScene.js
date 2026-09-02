@@ -230,31 +230,45 @@ export default class LobbyScene extends Phaser.Scene {
   }
 
   createControls() {
-    this.playButton = createButton(this, GAME_WIDTH / 2 - 148, 548, "Play slots", {
-      width: 260,
-      height: 58,
-      fontSize: 19,
+    this.playButton = createButton(this, GAME_WIDTH / 2 - 220, 522, "Play slots", {
+      width: 200,
+      height: 54,
+      fontSize: 17,
       onClick: () => this.playSlots(),
     });
 
-    this.bankButton = createButton(this, GAME_WIDTH / 2 + 148, 548, "Visit the bank", {
+    this.pokerButton = createButton(this, GAME_WIDTH / 2, 522, "Play poker", {
+      width: 200,
+      height: 54,
+      fontSize: 17,
+      onClick: () => this.playPoker(),
+    });
+
+    this.blackjackButton = createButton(this, GAME_WIDTH / 2 + 220, 522, "Play blackjack", {
+      width: 200,
+      height: 54,
+      fontSize: 17,
+      onClick: () => this.playBlackjack(),
+    });
+
+    this.bankButton = createButton(this, GAME_WIDTH / 2, 586, "Visit the bank", {
       width: 260,
-      height: 58,
-      fontSize: 19,
+      height: 48,
+      fontSize: 17,
       variant: "ghost",
       onClick: () => this.visitBank(),
     });
 
-    this.refreshButton = createButton(this, GAME_WIDTH / 2 - 120, 622, "Refresh balance", {
+    this.refreshButton = createButton(this, GAME_WIDTH / 2 - 120, 648, "Refresh balance", {
       width: 218,
-      height: 46,
+      height: 44,
       fontSize: 15,
       onClick: () => this.refresh(),
     });
 
-    createButton(this, GAME_WIDTH / 2 + 120, 622, "Sign out", {
+    createButton(this, GAME_WIDTH / 2 + 120, 648, "Sign out", {
       width: 218,
-      height: 46,
+      height: 44,
       fontSize: 15,
       variant: "ghost",
       onClick: () => this.signOut(),
@@ -266,7 +280,7 @@ export default class LobbyScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         GAME_HEIGHT - 26,
-        "Blackjack and roulette are still being dealt in.",
+        "Roulette is still being dealt in.",
         {
           fontFamily: FONT_BODY,
           fontSize: "13px",
@@ -279,6 +293,14 @@ export default class LobbyScene extends Phaser.Scene {
 
   playSlots() {
     this.goTo("Slots");
+  }
+
+  playPoker() {
+    this.goTo("Poker");
+  }
+
+  playBlackjack() {
+    this.goTo("Blackjack");
   }
 
   visitBank() {

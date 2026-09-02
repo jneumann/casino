@@ -2,8 +2,10 @@ import Phaser from "phaser";
 
 import AuthScene from "./scenes/AuthScene.js";
 import BankScene from "./scenes/BankScene.js";
+import BlackjackScene from "./scenes/BlackjackScene.js";
 import BootScene from "./scenes/BootScene.js";
 import LobbyScene from "./scenes/LobbyScene.js";
+import PokerScene from "./scenes/PokerScene.js";
 import SlotsScene from "./scenes/SlotsScene.js";
 import { COLORS, GAME_HEIGHT, GAME_WIDTH, css } from "./theme.js";
 import "./style.css";
@@ -23,7 +25,7 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, AuthScene, LobbyScene, BankScene, SlotsScene],
+  scene: [BootScene, AuthScene, LobbyScene, BankScene, SlotsScene, PokerScene, BlackjackScene],
 });
 
 // Phaser overlays the DOM layer with `position: absolute` but no `top`/`left`,

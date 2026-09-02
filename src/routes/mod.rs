@@ -1,6 +1,7 @@
 mod admin;
 mod auth;
 mod bank;
+mod blackjack;
 mod games;
 mod pages;
 mod status;
@@ -20,6 +21,14 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(bank::repay)
             .service(games::paytable)
             .service(games::spin)
+            .service(games::video_poker_paytable)
+            .service(games::video_poker_hand)
+            .service(games::video_poker_deal)
+            .service(games::video_poker_draw)
+            .service(blackjack::rules)
+            .service(blackjack::hand)
+            .service(blackjack::deal)
+            .service(blackjack::act)
             .service(status::health)
             .service(status::status)
             .service(

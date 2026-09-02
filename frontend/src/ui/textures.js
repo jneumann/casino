@@ -12,6 +12,7 @@ export function createTextures(scene, width, height) {
   createChip(scene, "chip-green", 96, 0x1f7a52, 0xf2e6d8);
   createChip(scene, "chip-gold", 96, 0xd6a83c, 0x53401a);
   createChip(scene, "chip-navy", 96, 0x2a3f70, 0xf2e6d8);
+  createCardBack(scene, "card-back", 118, 166);
 }
 
 /** The table surface: a warm pool of light in the middle fading to shadow. */
@@ -124,6 +125,31 @@ function createChip(scene, key, size, faceColor, edgeColor) {
   g.strokeCircle(radius, radius, radius * 0.44);
 
   g.generateTexture(key, size, size);
+  g.destroy();
+}
+
+/** A card back: dark green field, gold frames, a diamond in the centre. */
+function createCardBack(scene, key, width, height) {
+  if (scene.textures.exists(key)) return;
+
+  const g = scene.make.graphics({ add: false });
+
+  g.fillStyle(0x0a2b20, 1);
+  g.fillRoundedRect(0, 0, width, height, 10);
+
+  g.lineStyle(3, COLORS.goldDeep, 0.95);
+  g.strokeRoundedRect(5, 5, width - 10, height - 10, 8);
+
+  g.lineStyle(1.2, COLORS.gold, 0.45);
+  g.strokeRoundedRect(12, 12, width - 24, height - 24, 6);
+
+  const cx = width / 2;
+  const cy = height / 2;
+  g.fillStyle(COLORS.gold, 0.55);
+  g.fillTriangle(cx, cy - 22, cx + 16, cy, cx, cy + 22);
+  g.fillTriangle(cx, cy - 22, cx - 16, cy, cx, cy + 22);
+
+  g.generateTexture(key, width, height);
   g.destroy();
 }
 

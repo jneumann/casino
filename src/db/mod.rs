@@ -5,7 +5,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 
-use crate::models::{BalanceAdjustment, Loan, Operator, OperatorRole, User};
+use crate::models::{
+    BalanceAdjustment, BlackjackHand, Loan, Operator, OperatorRole, User, VideoPokerHand,
+};
 
 /// The persistence seam for the whole application. Handlers depend on this
 /// trait only, so moving off SQLite means adding one implementation.
@@ -30,6 +32,50 @@ pub trait Store: Send + Sync + 'static {
     /// Returns the balance afterwards, or [`StoreError::InsufficientFunds`] if
     /// the player could not cover the stake.
     async fn settle_spin(&self, spin: SpinRecord<'_>) -> Result<i64, StoreError>;
+
+    /// The player's video-poker hand waiting on a draw, if they have one.
+    async fn open_video_poker_hand(
+        &self,
+        user_id: i64,
+    ) -> Result<Option<VideoPokerHand>, StoreError>;
+
+    /// Debits the stake and records the dealt hand. The unique index on an
+    /// open hand is what two concurrent deals race against.
+    async fn deal_video_poker(
+        &self,
+        deal: VideoPokerDealRecord<'_>,
+    ) -> Result<(VideoPokerHand, i64), StoreError>;
+
+    /// Credits the payout and stamps the draw. Returns the settled hand and
+    /// the balance afterwards.
+    async fn settle_video_poker(
+        &self,
+        settle: VideoPokerSettleRecord<'_>,
+    ) -> Result<(VideoPokerHand, i64), StoreError>;
+
+    /// The player's blackjack hand waiting on a hit, stand, double, or split.
+    async fn open_blackjack_hand(&self, user_id: i64) -> Result<Option<BlackjackHand>, StoreError>;
+
+    /// Debits the stake and records the dealt table. A natural may already be
+    /// settled in the same transaction.
+    async fn deal_blackjack(
+        &self,
+        deal: BlackjackDealRecord<'_>,
+    ) -> Result<(BlackjackHand, i64), StoreError>;
+
+    /// Writes a mid-hand hit or split. The version is what two concurrent
+    /// acts race. `extra_bet` is the second stake on a split, or a double
+    /// that did not finish the table.
+    async fn update_blackjack(
+        &self,
+        update: BlackjackUpdateRecord<'_>,
+    ) -> Result<(BlackjackHand, i64), StoreError>;
+
+    /// Optionally debits a double, credits the payout, and stamps the hand.
+    async fn settle_blackjack(
+        &self,
+        settle: BlackjackSettleRecord<'_>,
+    ) -> Result<(BlackjackHand, i64), StoreError>;
 
     /// The player's open house marker, if they have one.
     async fn open_loan(&self, user_id: i64) -> Result<Option<Loan>, StoreError>;
@@ -121,6 +167,66 @@ pub struct SpinRecord<'a> {
     pub reels: &'a str,
 }
 
+/// A dealt video-poker hand waiting to be recorded. `remaining` is the stock
+/// the draw will come from and must never be returned to the client.
+#[derive(Debug, Clone, Copy)]
+pub struct VideoPokerDealRecord<'a> {
+    pub user_id: i64,
+    pub bet: i64,
+    pub dealt: &'a str,
+    pub remaining: &'a str,
+}
+
+/// A draw that has been played and now needs paying for.
+#[derive(Debug, Clone, Copy)]
+pub struct VideoPokerSettleRecord<'a> {
+    pub user_id: i64,
+    pub hand_id: i64,
+    pub held: &'a str,
+    pub drawn: &'a str,
+    pub outcome: &'a str,
+    pub payout: i64,
+}
+
+/// A dealt blackjack table waiting to be recorded. `dealer` includes the hole
+/// card and must not be returned to the client until the hand is settled.
+#[derive(Debug, Clone, Copy)]
+pub struct BlackjackDealRecord<'a> {
+    pub user_id: i64,
+    pub bet: i64,
+    pub player: &'a str,
+    pub dealer: &'a str,
+    pub remaining: &'a str,
+    pub outcome: Option<&'a str>,
+    pub payout: i64,
+}
+
+/// A hit or split that did not finish the table.
+#[derive(Debug, Clone, Copy)]
+pub struct BlackjackUpdateRecord<'a> {
+    pub user_id: i64,
+    pub hand_id: i64,
+    pub version: i64,
+    pub extra_bet: i64,
+    pub player: &'a str,
+    pub remaining: &'a str,
+}
+
+/// A blackjack hand that has been played and now needs paying for.
+#[derive(Debug, Clone, Copy)]
+pub struct BlackjackSettleRecord<'a> {
+    pub user_id: i64,
+    pub hand_id: i64,
+    pub version: i64,
+    pub extra_bet: i64,
+    pub player: &'a str,
+    pub dealer: &'a str,
+    pub remaining: &'a str,
+    pub doubled: bool,
+    pub outcome: &'a str,
+    pub payout: i64,
+}
+
 /// A marker the cashier has agreed to write, waiting to be recorded.
 #[derive(Debug, Clone, Copy)]
 pub struct LoanRecord {
@@ -173,6 +279,12 @@ pub enum StoreError {
 
     #[error("no outstanding loan to repay")]
     NoOpenLoan,
+
+    #[error("a hand is already in play")]
+    HandInProgress,
+
+    #[error("no hand is in play")]
+    NoOpenHand,
 
     #[error("account no longer exists")]
     UnknownUser,

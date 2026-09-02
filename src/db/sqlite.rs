@@ -7,10 +7,14 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::{Row, SqlitePool};
 
 use super::{
-    AdjustmentFilter, BalanceAdjustmentRecord, LoanRecord, PlayerFilter, SpinRecord, Store,
-    StoreError,
+    AdjustmentFilter, BalanceAdjustmentRecord, BlackjackDealRecord, BlackjackSettleRecord,
+    BlackjackUpdateRecord, LoanRecord, PlayerFilter, SpinRecord, Store, StoreError,
+    VideoPokerDealRecord, VideoPokerSettleRecord,
 };
-use crate::models::{BalanceAdjustment, Loan, Operator, OperatorRole, STARTING_BALANCE, User};
+use crate::models::{
+    BalanceAdjustment, BlackjackHand, Loan, Operator, OperatorRole, STARTING_BALANCE, User,
+    VideoPokerHand,
+};
 
 pub struct SqliteStore {
     pool: SqlitePool,
@@ -168,6 +172,369 @@ impl Store for SqliteStore {
         tx.commit().await?;
 
         Ok(balance_after)
+    }
+
+    async fn open_video_poker_hand(
+        &self,
+        user_id: i64,
+    ) -> Result<Option<VideoPokerHand>, StoreError> {
+        let hand = sqlx::query_as::<_, VideoPokerHand>(
+            "SELECT id, user_id, bet, dealt, remaining, held, drawn, outcome, payout, \
+             balance_after, created_at, settled_at \
+             FROM video_poker_hands WHERE user_id = ? AND settled_at IS NULL",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(hand)
+    }
+
+    async fn deal_video_poker(
+        &self,
+        deal: VideoPokerDealRecord<'_>,
+    ) -> Result<(VideoPokerHand, i64), StoreError> {
+        let mut tx = self.pool.begin().await?;
+
+        // Debit first so two concurrent deals cannot both pass an affordability
+        // check. If the insert then loses the unique race on an open hand, the
+        // rollback puts the stake back.
+        let balance: Option<i64> = sqlx::query_scalar(
+            "UPDATE users SET balance = balance - ? \
+             WHERE id = ? AND balance >= ? \
+             RETURNING balance",
+        )
+        .bind(deal.bet)
+        .bind(deal.user_id)
+        .bind(deal.bet)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some(balance) = balance else {
+            let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE id = ?")
+                .bind(deal.user_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+
+            return Err(if exists.is_some() {
+                StoreError::InsufficientFunds
+            } else {
+                StoreError::UnknownUser
+            });
+        };
+
+        let inserted = sqlx::query_as::<_, VideoPokerHand>(
+            "INSERT INTO video_poker_hands \
+             (user_id, bet, dealt, remaining, balance_after, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?) \
+             RETURNING id, user_id, bet, dealt, remaining, held, drawn, outcome, payout, \
+             balance_after, created_at, settled_at",
+        )
+        .bind(deal.user_id)
+        .bind(deal.bet)
+        .bind(deal.dealt)
+        .bind(deal.remaining)
+        .bind(balance)
+        .bind(Utc::now())
+        .fetch_one(&mut *tx)
+        .await;
+
+        let hand = match inserted {
+            Ok(hand) => hand,
+            Err(sqlx::Error::Database(err)) if err.is_unique_violation() => {
+                return Err(StoreError::HandInProgress);
+            }
+            Err(err) => return Err(err.into()),
+        };
+
+        tx.commit().await?;
+
+        Ok((hand, balance))
+    }
+
+    async fn settle_video_poker(
+        &self,
+        settle: VideoPokerSettleRecord<'_>,
+    ) -> Result<(VideoPokerHand, i64), StoreError> {
+        let mut tx = self.pool.begin().await?;
+
+        // Claim the open hand first so a second concurrent draw cannot credit
+        // the same payout. If the player vanished, the transaction rolls back
+        // and the hand stays open.
+        let claimed: Option<VideoPokerHand> = sqlx::query_as::<_, VideoPokerHand>(
+            "UPDATE video_poker_hands \
+             SET held = ?, drawn = ?, outcome = ?, payout = ?, settled_at = ? \
+             WHERE id = ? AND user_id = ? AND settled_at IS NULL \
+             RETURNING id, user_id, bet, dealt, remaining, held, drawn, outcome, payout, \
+             balance_after, created_at, settled_at",
+        )
+        .bind(settle.held)
+        .bind(settle.drawn)
+        .bind(settle.outcome)
+        .bind(settle.payout)
+        .bind(Utc::now())
+        .bind(settle.hand_id)
+        .bind(settle.user_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some(claimed) = claimed else {
+            return Err(StoreError::NoOpenHand);
+        };
+
+        let balance: Option<i64> = sqlx::query_scalar(
+            "UPDATE users SET balance = balance + ? WHERE id = ? RETURNING balance",
+        )
+        .bind(settle.payout)
+        .bind(settle.user_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some(balance) = balance else {
+            return Err(StoreError::UnknownUser);
+        };
+
+        sqlx::query("UPDATE video_poker_hands SET balance_after = ? WHERE id = ?")
+            .bind(balance)
+            .bind(claimed.id)
+            .execute(&mut *tx)
+            .await?;
+
+        tx.commit().await?;
+
+        let mut claimed = claimed;
+        claimed.balance_after = balance;
+        claimed.payout = Some(settle.payout);
+
+        Ok((claimed, balance))
+    }
+
+    async fn open_blackjack_hand(&self, user_id: i64) -> Result<Option<BlackjackHand>, StoreError> {
+        let hand = sqlx::query_as::<_, BlackjackHand>(
+            "SELECT id, user_id, bet, doubled, player, dealer, remaining, outcome, payout, \
+             balance_after, version, created_at, settled_at \
+             FROM blackjack_hands WHERE user_id = ? AND settled_at IS NULL",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(hand)
+    }
+
+    async fn deal_blackjack(
+        &self,
+        deal: BlackjackDealRecord<'_>,
+    ) -> Result<(BlackjackHand, i64), StoreError> {
+        let mut tx = self.pool.begin().await?;
+        let now = Utc::now();
+
+        let balance: Option<i64> = sqlx::query_scalar(
+            "UPDATE users SET balance = balance - ? \
+             WHERE id = ? AND balance >= ? \
+             RETURNING balance",
+        )
+        .bind(deal.bet)
+        .bind(deal.user_id)
+        .bind(deal.bet)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some(mut balance) = balance else {
+            let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE id = ?")
+                .bind(deal.user_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+
+            return Err(if exists.is_some() {
+                StoreError::InsufficientFunds
+            } else {
+                StoreError::UnknownUser
+            });
+        };
+
+        if deal.outcome.is_some() && deal.payout > 0 {
+            balance = sqlx::query_scalar(
+                "UPDATE users SET balance = balance + ? WHERE id = ? RETURNING balance",
+            )
+            .bind(deal.payout)
+            .bind(deal.user_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(StoreError::UnknownUser)?;
+        }
+
+        let settled_at = deal.outcome.map(|_| now);
+        let inserted = sqlx::query_as::<_, BlackjackHand>(
+            "INSERT INTO blackjack_hands \
+             (user_id, bet, player, dealer, remaining, outcome, payout, balance_after, \
+              created_at, settled_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             RETURNING id, user_id, bet, doubled, player, dealer, remaining, outcome, payout, \
+             balance_after, version, created_at, settled_at",
+        )
+        .bind(deal.user_id)
+        .bind(deal.bet)
+        .bind(deal.player)
+        .bind(deal.dealer)
+        .bind(deal.remaining)
+        .bind(deal.outcome)
+        .bind(deal.outcome.map(|_| deal.payout))
+        .bind(balance)
+        .bind(now)
+        .bind(settled_at)
+        .fetch_one(&mut *tx)
+        .await;
+
+        let hand = match inserted {
+            Ok(hand) => hand,
+            Err(sqlx::Error::Database(err)) if err.is_unique_violation() => {
+                return Err(StoreError::HandInProgress);
+            }
+            Err(err) => return Err(err.into()),
+        };
+
+        tx.commit().await?;
+
+        Ok((hand, balance))
+    }
+
+    async fn update_blackjack(
+        &self,
+        update: BlackjackUpdateRecord<'_>,
+    ) -> Result<(BlackjackHand, i64), StoreError> {
+        let mut tx = self.pool.begin().await?;
+
+        let balance: Option<i64> = sqlx::query_scalar("SELECT balance FROM users WHERE id = ?")
+            .bind(update.user_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+        let Some(mut balance) = balance else {
+            return Err(StoreError::UnknownUser);
+        };
+
+        if update.extra_bet > 0 {
+            let debited: Option<i64> = sqlx::query_scalar(
+                "UPDATE users SET balance = balance - ? \
+                 WHERE id = ? AND balance >= ? \
+                 RETURNING balance",
+            )
+            .bind(update.extra_bet)
+            .bind(update.user_id)
+            .bind(update.extra_bet)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+            let Some(next) = debited else {
+                return Err(StoreError::InsufficientFunds);
+            };
+            balance = next;
+        }
+
+        let hand = sqlx::query_as::<_, BlackjackHand>(
+            "UPDATE blackjack_hands \
+             SET player = ?, remaining = ?, version = version + 1 \
+             WHERE id = ? AND user_id = ? AND version = ? AND settled_at IS NULL \
+             RETURNING id, user_id, bet, doubled, player, dealer, remaining, outcome, payout, \
+             balance_after, version, created_at, settled_at",
+        )
+        .bind(update.player)
+        .bind(update.remaining)
+        .bind(update.hand_id)
+        .bind(update.user_id)
+        .bind(update.version)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some(hand) = hand else {
+            return Err(StoreError::NoOpenHand);
+        };
+
+        tx.commit().await?;
+        Ok((hand, balance))
+    }
+
+    async fn settle_blackjack(
+        &self,
+        settle: BlackjackSettleRecord<'_>,
+    ) -> Result<(BlackjackHand, i64), StoreError> {
+        let mut tx = self.pool.begin().await?;
+
+        if settle.extra_bet > 0 {
+            let debited: Option<i64> = sqlx::query_scalar(
+                "UPDATE users SET balance = balance - ? \
+                 WHERE id = ? AND balance >= ? \
+                 RETURNING balance",
+            )
+            .bind(settle.extra_bet)
+            .bind(settle.user_id)
+            .bind(settle.extra_bet)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+            if debited.is_none() {
+                let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE id = ?")
+                    .bind(settle.user_id)
+                    .fetch_optional(&mut *tx)
+                    .await?;
+
+                return Err(if exists.is_some() {
+                    StoreError::InsufficientFunds
+                } else {
+                    StoreError::UnknownUser
+                });
+            }
+        }
+
+        let claimed: Option<BlackjackHand> = sqlx::query_as::<_, BlackjackHand>(
+            "UPDATE blackjack_hands \
+             SET player = ?, dealer = ?, remaining = ?, doubled = ?, outcome = ?, payout = ?, \
+                 settled_at = ?, version = version + 1 \
+             WHERE id = ? AND user_id = ? AND version = ? AND settled_at IS NULL \
+             RETURNING id, user_id, bet, doubled, player, dealer, remaining, outcome, payout, \
+             balance_after, version, created_at, settled_at",
+        )
+        .bind(settle.player)
+        .bind(settle.dealer)
+        .bind(settle.remaining)
+        .bind(i64::from(settle.doubled))
+        .bind(settle.outcome)
+        .bind(settle.payout)
+        .bind(Utc::now())
+        .bind(settle.hand_id)
+        .bind(settle.user_id)
+        .bind(settle.version)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some(claimed) = claimed else {
+            return Err(StoreError::NoOpenHand);
+        };
+
+        let balance: Option<i64> = sqlx::query_scalar(
+            "UPDATE users SET balance = balance + ? WHERE id = ? RETURNING balance",
+        )
+        .bind(settle.payout)
+        .bind(settle.user_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some(balance) = balance else {
+            return Err(StoreError::UnknownUser);
+        };
+
+        sqlx::query("UPDATE blackjack_hands SET balance_after = ? WHERE id = ?")
+            .bind(balance)
+            .bind(claimed.id)
+            .execute(&mut *tx)
+            .await?;
+
+        tx.commit().await?;
+
+        let mut claimed = claimed;
+        claimed.balance_after = balance;
+        claimed.payout = Some(settle.payout);
+
+        Ok((claimed, balance))
     }
 
     async fn open_loan(&self, user_id: i64) -> Result<Option<Loan>, StoreError> {

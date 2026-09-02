@@ -43,3 +43,28 @@ export const SYMBOLS = {
   star: { glyph: "\u2605", color: 0xe8c46a, label: "Star" },
   seven: { glyph: "7", color: 0xe8c46a, label: "Seven" },
 };
+
+/** Rank labels as the poker table draws them. Keys match the server. */
+export const RANKS = {
+  two: "2",
+  three: "3",
+  four: "4",
+  five: "5",
+  six: "6",
+  seven: "7",
+  eight: "8",
+  nine: "9",
+  ten: "10",
+  jack: "J",
+  queen: "Q",
+  king: "K",
+  ace: "A",
+};
+
+/** Suits on a cream card face: dark for clubs/spades, house red for the rest. */
+export const SUITS = {
+  clubs: { glyph: "\u2663", color: 0x1c2418 },
+  diamonds: { glyph: "\u2666", color: COLORS.red },
+  hearts: { glyph: "\u2665", color: COLORS.red },
+  spades: { glyph: "\u2660", color: 0x1c2418 },
+};

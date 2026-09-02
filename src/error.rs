@@ -33,6 +33,12 @@ pub enum ApiError {
     #[error("you do not have an outstanding loan")]
     NoOpenLoan,
 
+    #[error("you already have a hand in play")]
+    HandInProgress,
+
+    #[error("you do not have a hand in play")]
+    NoOpenHand,
+
     #[error("internal server error")]
     Store(#[from] StoreError),
 
@@ -52,6 +58,8 @@ impl ApiError {
             Self::InsufficientFunds => "insufficient_funds",
             Self::LoanOutstanding => "loan_outstanding",
             Self::NoOpenLoan => "no_open_loan",
+            Self::HandInProgress => "hand_in_progress",
+            Self::NoOpenHand => "no_open_hand",
             Self::Store(_) | Self::Internal(_) => "internal_error",
         }
     }
@@ -68,6 +76,8 @@ impl ResponseError for ApiError {
             Self::InsufficientFunds => StatusCode::PAYMENT_REQUIRED,
             Self::LoanOutstanding => StatusCode::CONFLICT,
             Self::NoOpenLoan => StatusCode::BAD_REQUEST,
+            Self::HandInProgress => StatusCode::CONFLICT,
+            Self::NoOpenHand => StatusCode::BAD_REQUEST,
             Self::Store(_) | Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

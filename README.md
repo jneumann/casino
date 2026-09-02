@@ -69,6 +69,14 @@ Player surface:
 | `POST` | `/api/bank/repay`     | player | Clear the outstanding marker in full       |
 | `GET`  | `/api/slots/paytable` | public | Symbols, payouts, stake limits, and RTP    |
 | `POST` | `/api/slots/spin`     | player | Play one spin and settle the stake         |
+| `GET`  | `/api/video-poker/paytable` | public | Hands, payouts, stake limits, and RTP |
+| `GET`  | `/api/video-poker/hand`     | player | The dealt hand waiting on a draw, if any |
+| `POST` | `/api/video-poker/deal`     | player | Stake a bet and receive five cards      |
+| `POST` | `/api/video-poker/draw`     | player | Hold cards, draw the rest, and settle   |
+| `GET`  | `/api/blackjack/rules`      | public | Payouts, stake limits, and house rules  |
+| `GET`  | `/api/blackjack/hand`       | player | The open table, if a hand is in play    |
+| `POST` | `/api/blackjack/deal`       | player | Stake a bet and receive two cards each  |
+| `POST` | `/api/blackjack/act`        | player | Hit, stand, double, or split            |
 
 Operator surface:
 
@@ -107,7 +115,7 @@ src/
   auth/          Argon2 hashing, credential policy, JWT, bearer extractor
   db/            Store trait + SQLite implementation
   models/        domain types, including STARTING_BALANCE, Loan, and Operator
-  games/         slot machine math and house-bank terms
+  games/         slot machine math, video poker, blackjack, and house-bank terms
   routes/        /api handlers, /api/admin handlers, and the page routes
   bin/create_user.rs      creates a player
   bin/create_operator.rs  creates a dashboard login
@@ -135,9 +143,11 @@ Rebuild and commit `static/` whenever you change anything under `frontend/src`.
 
 Scenes live in `frontend/src/scenes`: `BootScene` generates the artwork and
 resumes a stored session, `AuthScene` handles sign-in and registration,
-`LobbyScene` shows the balance, `BankScene` is the cashier, and `SlotsScene`
-is the slot machine. All the graphics are drawn procedurally at boot
-(`frontend/src/ui/textures.js`), so there are no image assets to serve.
+`LobbyScene` shows the balance, `BankScene` is the cashier, `SlotsScene`
+is the slot machine, `PokerScene` is Jacks or Better, and `BlackjackScene`
+is blackjack. All the graphics
+are drawn procedurally at boot (`frontend/src/ui/textures.js`), so there are
+no image assets to serve.
 
 When making a Container clickable, note that Phaser adds `displayOrigin` to the
 local point before testing it, so **hit areas are measured from the container's
@@ -189,6 +199,80 @@ Two rules the implementation depends on:
 
 Every settled spin is written to the `spins` table with the reels and the
 resulting balance, so balances can be reconciled against the play history.
+
+## The video poker
+
+Jacks or Better, 6/5 paytable: five cards from a shuffled 52-card deck, then
+one draw of anything the player does not hold. A full house pays 6x and a
+flush pays 5x. The royal is the five-coin rate (800x) at every stake, so the
+return does not depend on how much is bet.
+
+| Hand | Pays |
+| ---- | ---- |
+| Royal flush | 800x |
+| Straight flush | 50x |
+| Four of a kind | 25x |
+| Full house | 6x |
+| Flush | 5x |
+| Straight | 4x |
+| Three of a kind | 3x |
+| Two pair | 2x |
+| Jacks or better | 1x |
+
+That is the published **95% return to player** with optimal holds — a 5% house
+edge, in the same band as the slot machine. Unlike the reels, the draw is a
+skill choice, so the return cannot be enumerated the same way. The tests
+instead pin the evaluator against the known 2,598,960 five-card poker hands
+so a ranking bug cannot quietly change what the machine pays.
+
+Two extra rules on top of the ones the slot machine already follows:
+
+- **The remaining stock never leaves the server.** The client sees the five
+  dealt cards and posts which of them to hold; replacements come from the 47
+  cards that stayed in the database.
+- **One hand in play at a time.** The stake is taken on the deal. A unique
+  index on an unsettled row is what two concurrent deals race against, and
+  the draw claims that row before it credits the payout, the same way a
+  repayment claims a loan. Leaving the table mid-hand keeps the deal; coming
+  back restores it.
+
+Settled hands are written to `video_poker_hands` with the dealt cards, the
+holds, the final five, and the resulting balance.
+
+## The blackjack table
+
+Single-deck blackjack, reshuffled every hand. The dealer hits soft 17.
+Blackjack pays **3:2** (odd stakes round down to a whole coin). You may double
+any two-card total, including after a split. Pairs of the same rank may be
+split once; split aces take one card each and a two-card 21 after a split
+pays even money. There is no insurance, no surrender, and no resplit.
+
+| Result | Pays |
+| ------ | ---- |
+| Blackjack | 3:2 |
+| Win | 1:1 |
+| Push | stake back |
+| Dealer wins, bust, or dealer blackjack | lose |
+
+The posted return is **96%** with a stand-on-17 strategy — a 4% house edge, in
+the same band as the other games. Skill (when to hit, stand, double, or split)
+moves that number, so the tests pin the totals, the peek, and a seeded sample
+rather than enumerating every shoe.
+
+The same two rules as video poker:
+
+- **The hole card and the remaining stock never leave the server.** The client
+  sees the player's hands and the dealer's up card, then posts `hit`, `stand`,
+  `double`, or `split`. Replacements and the hole card are revealed only when
+  the table ends.
+- **One table in play at a time.** The stake is taken on the deal; a split or
+  a mid-table double debits the extra stake immediately. A unique index on an
+  unsettled row is what two concurrent deals race against, and each act claims
+  the row by version so two clicks cannot both hit. Leaving the table mid-hand
+  keeps it; coming back restores it.
+
+Settled hands are written to `blackjack_hands` with both sides' cards and the
+resulting balance.
 
 ## The house bank
 
